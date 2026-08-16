@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+
+# Env files hold real tokens. Only the example is committed.
+.env
+.env.*
+!.env.example

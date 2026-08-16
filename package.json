@@ -1,0 +1,71 @@
+{
+  "name": "ha-analytics-mcp",
+  "version": "0.1.0",
+  "description": "Historical data analytics MCP server for Home Assistant: statistics, trends and session detection computed server-side, designed for small local models",
+  "mcpName": "io.github.ffleurey/ha-analytics-mcp",
+  "main": "dist/index.js",
+  "bin": {
+    "ha-analytics-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "NOTICE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file=.env --import=tsx/esm src/index.ts",
+    "dev": "node --env-file=.env --import=tsx/esm src/index.ts --http",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "capture": "node --env-file=.env --import=tsx/esm scripts/capture-fixture.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ffleurey/ha-analytics-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ffleurey/ha-analytics-mcp/issues"
+  },
+  "homepage": "https://github.com/ffleurey/ha-analytics-mcp#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "home-assistant",
+    "analytics",
+    "statistics",
+    "home-automation",
+    "llm"
+  ],
+  "author": "Franck Fleurey",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "simple-statistics": "^7.8.9",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
+    "vitest": "^4.1.5"
+  }
+}

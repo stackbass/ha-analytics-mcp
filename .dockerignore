@@ -1,0 +1,37 @@
+# Build context exclusions — keep `docker build .` fast and the image lean.
+# The Dockerfile COPYs only package.json/package-lock.json/tsconfig.json/src
+# explicitly, so this is mostly a safety net (and keeps context upload small).
+
+# Installed/compiled output — rebuilt inside the image
+node_modules
+dist
+
+# Version control / CI
+.git
+.github
+
+# Docker files themselves — not needed inside the image
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Project docs and planning material — not needed at runtime.
+# (NOTICE and LICENSE are kept: they're small and license-attribution-relevant.)
+*.md
+backlog
+evaluation
+
+# Local dev / secrets
+.env
+.env.*
+!.env.example
+*.local
+.vscode
+.idea
+
+# Test / coverage artefacts
+coverage
+.nyc_output
+
+# Misc OS cruft
+.DS_Store

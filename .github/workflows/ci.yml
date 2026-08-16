@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # A green lockfile can go bad with no commit when a new advisory lands, so
+  # re-run this on a schedule and not only on change.
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Type-check, lint, test, audit (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Both supported LTS lines: 22 (maintenance, the engines floor) and
+      # 24 (active, what the Docker image runs on).
+      matrix:
+        node-version: ["22", "24"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # Installs strictly from the lockfile, and fails if it has drifted out
+      # of sync with package.json.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Production build — separate from the type-check above so a
+      # tsc-vs-build config drift (e.g. emit-only issues) surfaces here too.
+      - name: Build
+        run: npm run build
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+
+      # Checks that every installed package still carries a valid registry
+      # signature.
+      - name: Audit package signatures
+        run: npm audit signatures
+
+      # Build (no push) to catch Dockerfile rot — a broken COPY path, a
+      # missing build step, etc. — on every PR instead of only at release time.
+      # Once per run is enough; the image pins its own Node version.
+      - name: Build Docker image
+        if: matrix.node-version == '24'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: ha-analytics-mcp:ci
+
+      # Scan the built image (base OS + bundled node_modules) so a CVE in the
+      # base image fails CI on the weekly scheduled run, not at release time.
+      - name: Scan Docker image for vulnerabilities
+        if: matrix.node-version == '24'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ha-analytics-mcp:ci
+          scanners: vuln
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
