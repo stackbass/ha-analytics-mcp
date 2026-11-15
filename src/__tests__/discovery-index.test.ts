@@ -10,7 +10,7 @@
  * All tests use in-memory fixture data — no real HA connection required.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { scoreArea } from "../tools/list-areas.js";
 import { scoreDevice, deviceMetricSummary } from "../tools/list-devices.js";
 import { scoreEntity } from "../tools/list-device-entities.js";
@@ -713,6 +713,14 @@ function makeEntityListFixture(): EnrichedEntity[] {
 describe("handleListEntities output", () => {
   beforeEach(() => {
     vi.mocked(getCachedEntityList).mockReturnValue(makeEntityListFixture());
+    // Search queries also run a best-effort live-state sweep (GET /api/states).
+    // Keep it offline: a real request to the fake HA_URL (ha.test.local) can
+    // stall on mDNS resolution (macOS) past the 5 s test timeout.
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline in tests"));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("groups entities by area and device", async () => {
