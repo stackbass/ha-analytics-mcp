@@ -97,9 +97,13 @@ export function parseDayStartHour(raw: unknown, groupByDay: boolean): number | s
 // HA timezone helper
 // ---------------------------------------------------------------------------
 
-/** Returns the HA server timezone from cache (falls back to UTC). */
+/**
+ * Returns the timezone for day boundaries and labels: HA_TIMEZONE if set
+ * (as ha_history_get_current_time already does), else the HA server
+ * timezone from cache, else UTC.
+ */
 export function getTz(): string {
-  return getCachedHAConfig()?.timezone ?? "UTC";
+  return config.haTimezone ?? getCachedHAConfig()?.timezone ?? "UTC";
 }
 
 // ---------------------------------------------------------------------------

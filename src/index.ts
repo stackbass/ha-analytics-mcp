@@ -14,6 +14,7 @@ import { config, getConfig, ConfigError } from "./config.js";
 import { parseMode, assertHttpBindingAllowed, requireAuth } from "./cli.js";
 import {
   prefetchStartupData,
+  ensureHAConfig,
   isHAReachable,
   getCachedDiscoveryIndex,
   setCachedDiscoveryIndex,
@@ -94,6 +95,7 @@ async function callTool(
 ): Promise<string> {
   const invalid = validateArgs(name, args);
   if (invalid) return invalid;
+  await ensureHAConfig();
   switch (name) {
     case "ha_history_get_current_time":       return handleGetCurrentTime();
     case "ha_history_list_areas":             return handleListAreas(args);

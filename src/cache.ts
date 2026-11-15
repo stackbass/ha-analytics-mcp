@@ -86,6 +86,22 @@ export function setCachedHAConfig(cfg: HAConfig): void {
   set("ha_config", cfg, HA_CONFIG_TTL_MS);
 }
 
+/**
+ * Reloads the HA config when the cache entry is missing or expired (1 h TTL).
+ * Without it, getTz() silently fell back to UTC one hour after startup and
+ * every day boundary and day label shifted (Europe/Rome: values under the
+ * previous day's date). Non-fatal: on failure the fallback stays in place.
+ */
+export async function ensureHAConfig(): Promise<void> {
+  if (getCachedHAConfig()) return;
+  const result = await fetchHAConfig();
+  if (isError(result)) {
+    logError("CACHE", "could not reload HA config", { error: result.text.split("\n")[0] });
+    return;
+  }
+  setCachedHAConfig(result);
+}
+
 /** Cache for statistics API responses. Immutable for periods ending >48h ago. */
 export function getCachedStats(key: string): unknown | undefined {
   return get(key);
