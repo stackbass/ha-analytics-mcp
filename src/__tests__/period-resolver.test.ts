@@ -92,10 +92,11 @@ describe("named expressions", () => {
     expect(r.start.toISOString()).toBe("2026-05-02T22:00:00.000Z");
   });
 
-  it("last month (in May) → start = April 1 Berlin = March 31 22:00 UTC, end = now", () => {
+  it("last month (in May) → full April: April 1 → May 1 Berlin", () => {
     const r = ok(resolvePeriod("last month", undefined, NOW, TZ));
     expect(r.start.toISOString()).toBe("2026-03-31T22:00:00.000Z");
-    expect(r.end.getTime()).toBe(NOW.getTime());
+    expect(r.end.toISOString()).toBe("2026-04-30T22:00:00.000Z");
+    expect(r.label).toBe("last month (2026-04-01 → 2026-04-30)");
   });
 
   it("this year → Jan 1 2026 midnight Berlin = Dec 31 2025 23:00 UTC", () => {
@@ -107,6 +108,61 @@ describe("named expressions", () => {
   it("last year → Jan 1 2025 midnight Berlin = Dec 31 2024 23:00 UTC", () => {
     const r = ok(resolvePeriod("last year", undefined, NOW, TZ));
     expect(r.start.toISOString()).toBe("2024-12-31T23:00:00.000Z");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Closed named periods end where the period ends (TOOLS.md), not at now
+// ---------------------------------------------------------------------------
+
+describe("closed named periods", () => {
+  it("yesterday → May 2 only, not May 2 until now", () => {
+    const r = ok(resolvePeriod("yesterday", undefined, NOW, TZ));
+    expect(r.start.toISOString()).toBe("2026-05-01T22:00:00.000Z");
+    expect(r.end.toISOString()).toBe("2026-05-02T22:00:00.000Z");
+    expect(r.label).toBe("yesterday (2026-05-02 → 2026-05-02)");
+  });
+
+  it("last week (Sun May 3) → Mon Apr 20 → Mon Apr 27", () => {
+    const r = ok(resolvePeriod("last week", undefined, NOW, TZ));
+    expect(r.start.toISOString()).toBe("2026-04-19T22:00:00.000Z");
+    expect(r.end.toISOString()).toBe("2026-04-26T22:00:00.000Z");
+  });
+
+  it("last year → full 2025", () => {
+    const r = ok(resolvePeriod("last year", undefined, NOW, TZ));
+    expect(r.start.toISOString()).toBe("2024-12-31T23:00:00.000Z");
+    expect(r.end.toISOString()).toBe("2025-12-31T23:00:00.000Z");
+  });
+
+  it("last winter (in May) → Dec 2025 → Mar 2026", () => {
+    const r = ok(resolvePeriod("last winter", undefined, NOW, TZ));
+    expect(r.start.toISOString()).toBe("2025-11-30T23:00:00.000Z");
+    expect(r.end.toISOString()).toBe("2026-02-28T23:00:00.000Z");
+  });
+
+  it("last winter (in January) → the previous, completed winter", () => {
+    const jan = new Date("2027-01-15T12:00:00Z");
+    const r = ok(resolvePeriod("last winter", undefined, jan, TZ));
+    expect(r.start.toISOString()).toBe("2025-11-30T23:00:00.000Z"); // Dec 1 2025
+    expect(r.end.toISOString()).toBe("2026-02-28T23:00:00.000Z");   // Mar 1 2026
+  });
+
+  it("last summer (in July) → the previous, completed summer", () => {
+    const jul = new Date("2026-07-15T12:00:00Z");
+    const r = ok(resolvePeriod("last summer", undefined, jul, TZ));
+    expect(r.start.toISOString()).toBe("2025-05-31T22:00:00.000Z"); // Jun 1 2025
+    expect(r.end.toISOString()).toBe("2025-08-31T22:00:00.000Z");   // Sep 1 2025
+  });
+
+  it("open periods (today, this month) still end at now", () => {
+    expect(ok(resolvePeriod("today", undefined, NOW, TZ)).end.getTime()).toBe(NOW.getTime());
+    expect(ok(resolvePeriod("this month", undefined, NOW, TZ)).end.getTime()).toBe(NOW.getTime());
+  });
+
+  it("an explicit end_time still wins", () => {
+    const r = ok(resolvePeriod("last month", "now", NOW, TZ));
+    expect(r.end.getTime()).toBe(NOW.getTime());
   });
 });
 

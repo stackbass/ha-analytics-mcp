@@ -14,6 +14,9 @@ import {
   subMonths,
   subYears,
   addDays,
+  addWeeks,
+  addMonths,
+  addYears,
   parseISO,
   isValid,
 } from "date-fns";
@@ -121,18 +124,20 @@ function resolveExpression(
     "this year": () => fromZonedTime(startOfYear(zonedNow), tz),
     "last year": () => fromZonedTime(startOfYear(subYears(zonedNow, 1)), tz),
     "last winter": () => {
-      // Winter starts in December; if we haven't reached December yet this year, take Dec of last year.
+      // Most recent *completed* winter (Dec–Feb): complete from March on, so in
+      // January/February the current winter is still running and the one before counts.
       const year =
-        zonedNow.getMonth() < 11
+        zonedNow.getMonth() >= 2
           ? zonedNow.getFullYear() - 1
-          : zonedNow.getFullYear();
+          : zonedNow.getFullYear() - 2;
       return fromZonedTime(new Date(year, 11, 1), tz);
     },
     "last summer": () => {
+      // Most recent *completed* summer (Jun–Aug): complete from September on.
       const year =
-        zonedNow.getMonth() < 6
-          ? zonedNow.getFullYear() - 1
-          : zonedNow.getFullYear();
+        zonedNow.getMonth() >= 8
+          ? zonedNow.getFullYear()
+          : zonedNow.getFullYear() - 1;
       return fromZonedTime(new Date(year, 5, 1), tz);
     },
   };
@@ -164,6 +169,20 @@ function resolveExpression(
 
   return null;
 }
+
+/**
+ * Named periods that denote a complete past period (see TOOLS.md). Without an
+ * explicit end_time they must end where the period ends, not at "now":
+ * "yesterday" is the previous calendar day, not "since yesterday 00:00".
+ */
+const CLOSED_NAMED_PERIODS: Record<string, (d: Date) => Date> = {
+  yesterday: (d) => addDays(d, 1),
+  "last week": (d) => addWeeks(d, 1),
+  "last month": (d) => addMonths(d, 1),
+  "last year": (d) => addYears(d, 1),
+  "last winter": (d) => addMonths(d, 3),
+  "last summer": (d) => addMonths(d, 3),
+};
 
 /** "overnight" = 22:00 yesterday → 06:00 today in HA timezone. */
 export function resolveOvernightPeriod(tz: string, now: Date): ResolvedPeriod {
@@ -235,6 +254,14 @@ export function resolvePeriod(
       );
       end = fromZonedTime(startOfDay(addDays(endOfQuarter, 1)), tz);
       autoLabel = `${s.toUpperCase()} ${zonedStart.getFullYear()}`;
+    }
+    // Closed named period with no explicit end → end where the period ends
+    else if (CLOSED_NAMED_PERIODS[s] && !endExpr) {
+      const r = resolveExpression(startExpr, now, tz);
+      if (!r)
+        return `ERROR: Invalid start_time "${startExpr}". Use formats like "2026-04-01", "7d", "last month", "april".`;
+      start = r.date;
+      end = fromZonedTime(CLOSED_NAMED_PERIODS[s]!(toZonedTime(r.date, tz)), tz);
     } else {
       const r = resolveExpression(startExpr, now, tz);
       if (!r)
