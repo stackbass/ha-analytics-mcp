@@ -155,10 +155,12 @@ export async function handleGetConsumption(
     if (cached) return cached as string;
 
     // Fetch granularity:
-    // - interval="none" → daily (compact, first/last sum delta gives accurate total)
-    // - interval breakdown → same as requested interval, plus one extra bucket before start as baseline
+    // - interval="none" → daily (compact)
+    // - interval breakdown → same as requested interval
+    // Either way, one extra bucket before start: HA's `sum` in a row is the meter
+    // value at the END of that row, so the row before the period is the baseline.
     const haPeriod = interval === "none" ? "day" : interval as "day" | "week" | "month";
-    const fetchStart = interval !== "none" ? expandStart(period.start, haPeriod) : period.start;
+    const fetchStart = expandStart(period.start, haPeriod);
 
     const statsResult = await fetchStatistics(
       [entityId],
@@ -184,7 +186,14 @@ export async function handleGetConsumption(
 
     // --- Scalar total (interval="none") ---
     if (interval === "none") {
-      const total = allRows[allRows.length - 1]!.sum - allRows[0]!.sum;
+      const totalResult = periodTotal(allRows, period.start);
+      if (!totalResult) {
+        return (
+          `${sensorLine}\nPeriod: ${period.label}\n` +
+          `Not enough statistics to compute a total (2+ daily readings needed).`
+        );
+      }
+      const { total, readings, firstDayMissing } = totalResult;
 
       // A requested comparison that cannot be computed is reported as
       // unavailable — never silently dropped from the payload.
@@ -192,15 +201,18 @@ export async function handleGetConsumption(
       if (comparison) {
         const compLabel = comparison === "previous_period" ? "previous period" : "same period last year";
         const refDates = getRefPeriod(period.start, period.end, comparison);
-        const refResult = await fetchStatistics([entityId], refDates.start, refDates.end, "day", ["sum"]);
+        const refResult = await fetchStatistics(
+          [entityId], expandStart(refDates.start, "day"), statsEndTime(refDates.end), "day", ["sum"]
+        );
         if (isError(refResult)) {
           compLine = `\nComparison (${compLabel}): unavailable — reference-period fetch failed (${refResult.text.split("\n")[0]})`;
         } else {
           const refRows = (refResult[entityId] ?? [])
             .filter((r): r is SumRow => r.sum !== null)
             .sort((a, b) => a.start - b.start);
-          if (refRows.length >= 2) {
-            const refTotal = refRows[refRows.length - 1]!.sum - refRows[0]!.sum;
+          const refResultTotal = periodTotal(refRows, refDates.start);
+          if (refResultTotal) {
+            const refTotal = refResultTotal.total;
             const diff = total - refTotal;
             const pct = refTotal !== 0 ? diff / refTotal * 100 : null;
             const sign = diff >= 0 ? "+" : "";
@@ -212,9 +224,12 @@ export async function handleGetConsumption(
         }
       }
 
+      const missingNote = firstDayMissing
+        ? ` (first day not included: no reading before the period)`
+        : "";
       const result =
-        `${sensorLine}\nPeriod: ${period.label} (${allRows.length} daily readings)\n` +
-        `Total: ${round(total, 2)}${unit}${compLine}`;
+        `${sensorLine}\nPeriod: ${period.label} (${readings} daily readings)\n` +
+        `Total: ${round(total, 2)}${unit}${missingNote}${compLine}`;
       setCachedStats(cacheKey, result, period.end);
       return result;
     }
@@ -291,6 +306,29 @@ export async function handleGetConsumption(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Consumption over [start, end) from cumulative-sum rows. HA's `sum` in a row
+ * is the meter value at the END of that row, so the total is the last
+ * in-period row minus the last row before the period (the baseline). Without
+ * a baseline (no data before the period) the first day cannot be counted.
+ */
+function periodTotal(
+  rows: SumRow[],
+  start: Date
+): { total: number; readings: number; firstDayMissing: boolean } | null {
+  const startMs = start.getTime();
+  const before = rows.filter((r) => r.start < startMs);
+  const inPeriod = rows.filter((r) => r.start >= startMs);
+  const last = inPeriod[inPeriod.length - 1];
+  if (!last) return null;
+  const baseline = before[before.length - 1];
+  if (baseline) {
+    return { total: last.sum - baseline.sum, readings: inPeriod.length, firstDayMissing: false };
+  }
+  if (inPeriod.length < 2) return null;
+  return { total: last.sum - inPeriod[0]!.sum, readings: inPeriod.length, firstDayMissing: true };
+}
 
 /** Subtract one period from a date to obtain a pre-period baseline row. */
 function expandStart(date: Date, period: "day" | "week" | "month"): Date {
