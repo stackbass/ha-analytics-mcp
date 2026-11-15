@@ -128,7 +128,7 @@ export async function handleGetConsumption(
     }
 
     // Validate entity (must have sum/cumulative capability)
-    const validation = validateEntity(entityId, "sum");
+    const validation = await validateEntity(entityId, "sum");
     if (typeof validation === "string") return validation;
     const { entity } = validation;
 

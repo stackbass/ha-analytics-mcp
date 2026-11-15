@@ -242,7 +242,7 @@ export async function handleGetSensorStats(
     const { returnAll, rowCap } = capParsed;
 
     // Validate entities (all at once, with same-unit check for multi-entity)
-    const validation = validateEntities(entityIds, "mean");
+    const validation = await validateEntities(entityIds, "mean");
     if (typeof validation === "string") return validation;
     const { entities } = validation;
 
