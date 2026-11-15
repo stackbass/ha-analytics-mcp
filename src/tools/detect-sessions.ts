@@ -202,7 +202,7 @@ export async function handleDetectSessions(
 
     // Validate upfront: a wrong entity_id gets candidates and the right
     // sibling tool now, instead of an empty result that looks like an answer.
-    const validation = validateEntity(entityId, "mean");
+    const validation = await validateEntity(entityId, "mean");
     if (typeof validation === "string") return validation;
     const meta = validation.entity;
     const unitStr = formatUnit(meta);

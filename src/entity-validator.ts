@@ -1,5 +1,6 @@
-import { getCachedEntityList } from "./cache.js";
-import { EnrichedEntity } from "./ha-client.js";
+import { getCachedEntityList, setCachedEntityList } from "./cache.js";
+import { EnrichedEntity, fetchEnrichedEntities } from "./ha-client.js";
+import { isError } from "./errors.js";
 
 export interface EntityValidation {
   entity: EnrichedEntity;
@@ -96,6 +97,20 @@ const LIST_NOT_LOADED =
   `ERROR: Entity list not yet loaded. The server may still be starting up. ` +
   `Retry the same call in a moment.`;
 
+/**
+ * Returns the cached entity list, reloading it from HA when the cache entry
+ * is missing or expired (1 h TTL). Without the reload, every validating tool
+ * fails one hour after startup until something else refills the cache.
+ */
+async function loadEntityList(): Promise<EnrichedEntity[] | undefined> {
+  const cached = getCachedEntityList();
+  if (cached) return cached;
+  const result = await fetchEnrichedEntities();
+  if (isError(result)) return undefined;
+  setCachedEntityList(result);
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -104,11 +119,11 @@ const LIST_NOT_LOADED =
  * Validates that an entity_id exists and has the expected capability.
  * Returns the enriched entity or an error string.
  */
-export function validateEntity(
+export async function validateEntity(
   entityId: string,
   capability: "mean" | "sum"
-): EntityValidation | string {
-  const result = validateEntities([entityId], capability);
+): Promise<EntityValidation | string> {
+  const result = await validateEntities([entityId], capability);
   if (typeof result === "string") return result;
   return { entity: result.entities[0]! };
 }
@@ -117,11 +132,11 @@ export function validateEntity(
  * Validates a list of entity_ids for capability and (for multi-entity) same-unit requirement.
  * Returns the enriched entities and their shared unit, or an error string.
  */
-export function validateEntities(
+export async function validateEntities(
   entityIds: string[],
   capability: "mean" | "sum"
-): EntitiesValidation | string {
-  const list = getCachedEntityList();
+): Promise<EntitiesValidation | string> {
+  const list = await loadEntityList();
   if (!list) return LIST_NOT_LOADED;
 
   const entities: EnrichedEntity[] = [];
