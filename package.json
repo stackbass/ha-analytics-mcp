@@ -1,6 +1,6 @@
 {
   "name": "ha-analytics-mcp",
-  "version": "0.1.0",
+  "version": "0.1.0-fix.3",
   "description": "Historical data analytics MCP server for Home Assistant: statistics, trends and session detection computed server-side, designed for small local models",
   "mcpName": "io.github.ffleurey/ha-analytics-mcp",
   "main": "dist/index.js",
